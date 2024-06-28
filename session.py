@@ -143,6 +143,7 @@ class Session:
             "he_pos": self.output_base_path() + ".he_pos.txt",
             "extras_log": self.output_base_path() + ".extras.log",
             "video_log": self.output_base_path() + ".video.log",
+            "baidu_log": self.output_base_path() + ".baidu.log",
         }
 
     async def merge_xml(self):
@@ -219,15 +220,6 @@ class Session:
         ]))  # prioritize wider, higher-res format
         video_res_x = video_res_sorted[0][1]
         video_res_y = video_res_sorted[0][2]
-        # try to scale to at least 1920x1080 or 1080x1920
-        if video_res_x > video_res_y:
-            if video_res_x < 1920:
-                video_res_y = video_res_y * 1920 // video_res_x
-                video_res_x = 1920
-        else:
-            if video_res_y < 1920:
-                video_res_x = video_res_x * 1920 // video_res_y
-                video_res_y = 1920
         return video_res_x, video_res_y
 
     async def process_danmaku(self):
@@ -264,6 +256,13 @@ class Session:
         await async_wait_output(ffmpeg_command)
         self.early_video_path = self.output_path()['early_video']
 
+    async def upload_baidu(self):
+        baidu_upload_command = f'''/BaiduPCS/BaiduPCS-Go \
+        u \
+        "{self.output_path()['early_video']}" /TaffyRec \
+        >> "{self.output_path()["baidu_log"]}" 2>&1'''
+        await async_wait_output(baidu_upload_command)
+
     async def process_video(self):
         total_time = sum([video.video_length_flv for video in self.videos])
         max_size = 8000_000 * 8  # Kb
@@ -272,7 +271,7 @@ class Session:
         max_video_bitrate = float(8000)  # BiliBili now re-encode every video anyways
         video_bitrate = int(min(max_video_bitrate, video_bitrate))
         video_res_x, video_res_y = self.get_resolution()
-        ffmpeg_command = f'''ffmpeg -y -loop 1 -t {total_time} \
+        ffmpeg_command = f'''ffmpeg  -y -loop 1 -t {total_time} \
         -i "{self.output_path()['he_graph']}" \
         -f concat \
         -safe 0 \
@@ -297,7 +296,7 @@ class Session:
         [out]ass='{self.output_path()['ass']}'[out_sub]" \
         -map "[out_sub]" -map 1:a ''' + \
                          (" -c:v h264_nvenc -preset slow "
-                          if GPUInfo.check_empty() is not None else " -c:v libx264 -preset medium ") + \
+                                 if GPUInfo.check_empty() is not None else " -c:v libx264 -preset medium ") + \
                          f'-b:v {video_bitrate}K' + f''' -b:a 320K -ar 44100  "{self.output_path()['danmaku_video']}" \
                     ''' + f'>> "{self.output_path()["video_log"]}" 2>&1'
         await async_wait_output(ffmpeg_command)
@@ -318,6 +317,7 @@ class Session:
         if len(self.videos) == 0:
             print(f"No video in session for {self.room_id}@{self.start_time}, skip!")
             return
+        await self.upload_baidu()
         await self.process_video()
 
 

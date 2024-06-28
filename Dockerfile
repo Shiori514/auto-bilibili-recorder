@@ -7,10 +7,18 @@ ENV TZ=Asia/Shanghai
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y wget git apt-transport-https software-properties-common
 RUN add-apt-repository universe
-RUN apt-get update && apt-get install -y wget ffmpeg fonts-noto-color-emoji fonts-noto-cjk-extra cmake python3 python3-pip python3-venv curl unzip
+RUN apt-get update && apt-get install -y wget fonts-noto-color-emoji fonts-noto-cjk-extra cmake python3 python3-pip python3-venv curl unzip
 RUN update-ca-certificates -f
 RUN apt-get update && apt-get install -y libc6 libgcc1 libgssapi-krb5-2 libicu70 libssl3 libstdc++6 zlib1g
 RUN [ "/bin/bash", "-c", "if [[ ${COMMON_IMAGE} == *'cuda'* ]] ; then ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 ; fi" ]
+
+ARG MediaSDK_TAGVERSION=21.2.3
+ENV LIBVA_DRIVER_NAME iHD
+ENV PKG_CONFIG_PATH /usr/lib/x86_64-linux-gnu/pkgconfig/
+ENV LIBVA_DRIVERS_PATH /usr/lib/x86_64-linux-gnu/dri/
+ENV LD_LIBRARY_PATH /opt/intel/mediasdk/lib/
+
+RUN apt-get update && apt-get install -y -q  locales libmfx1 libmfx-tools libva-dev libmfx-dev intel-media-va-driver-non-free vainfo git cmake pkg-config meson libdrm-dev automake libtool yasm wget vim gcc && wget https://github.com/Intel-Media-SDK/MediaSDK/archive/refs/tags/intel-mediasdk-$MediaSDK_TAGVERSION.tar.gz && tar -zxvf intel-mediasdk-$MediaSDK_TAGVERSION.tar.gz && cd MediaSDK-intel-mediasdk-$MediaSDK_TAGVERSION && mkdir build && cd build && cmake .. && make && make install && cd ../../ &&  git clone https://github.com/ffmpeg/ffmpeg && cd ffmpeg && ./configure --arch=x86_64 --disable-yasm --enable-vaapi --enable-libmfx && make &&  make install
 
 # Download from GitHub release
 RUN dpkgArch="$(uname -m)" && \
